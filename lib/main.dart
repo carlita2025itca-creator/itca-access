@@ -1,121 +1,706 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+// NOTA: Hemos comentado los imports de Firebase para esta prueba visual
+// import 'package:firebase_core/firebase_core.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:google_sign_in/google_sign_in.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ItcaAccessApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ItcaAccessApp extends StatelessWidget {
+  const ItcaAccessApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      debugShowCheckedModeBanner: false,
+      title: 'ITCA Access',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D47A1)),
+        useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const PantallaPrincipal(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+////////////////////////////// PANTALLA PRINCIPAL (LOGIN DIRECTO) //////////////////////////////
+class PantallaPrincipal extends StatefulWidget {
+  const PantallaPrincipal({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<PantallaPrincipal> createState() => _PantallaPrincipalState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _PantallaPrincipalState extends State<PantallaPrincipal> {
+  // Controladores para el login manual
+  final TextEditingController _correoController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void initState() {
+    super.initState();
+    pedirPermisosAutomaticos();
+  }
+
+  Future<void> pedirPermisosAutomaticos() async {
+    await [
+      Permission.location,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+    ].request();
+  }
+
+  // Simulación de Login Manual
+  Future<void> loginManualSimulado() async {
+    if (_correoController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor llena los campos')),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Verificando credenciales...')),
+    );
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const PantallaMenu()),
+      );
+    }
+  }
+
+  // Simulación de Login con Google
+  Future<void> loginConGoogleSimulado() async {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Conectando con Google...')));
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (mounted) {
+      // Simulamos que es nuevo y lo mandamos a completar los datos inclusivos
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PantallaCompletarPerfil(),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(30.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 1. Logo y Título
+                const Icon(
+                  Icons.accessibility_new,
+                  size: 80,
+                  color: Color(0xFF0D47A1),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'ITCA Access',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0D47A1),
+                  ),
+                ),
+                const Text(
+                  'Navegación Inclusiva',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+                const SizedBox(height: 40),
+
+                // 2. Formulario de Login Manual
+                TextField(
+                  controller: _correoController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Correo Electrónico',
+                    prefixIcon: const Icon(
+                      Icons.email,
+                      color: Color(0xFF0D47A1),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    labelText: 'Contraseña',
+                    prefixIcon: const Icon(
+                      Icons.lock,
+                      color: Color(0xFF0D47A1),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Botón Entrar
+                ElevatedButton(
+                  onPressed: loginManualSimulado,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D47A1),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 55),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Iniciar Sesión',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // 3. Divisor visual
+                const Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey, thickness: 1)),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(
+                        'O',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey, thickness: 1)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // 4. Botón de Google Inclusivo y Grande
+                OutlinedButton.icon(
+                  onPressed: loginConGoogleSimulado,
+                  icon: const Icon(
+                    Icons.g_mobiledata,
+                    size: 35,
+                    color: Colors.red,
+                  ),
+                  label: const Text(
+                    'Continuar con Google',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 55),
+                    side: const BorderSide(color: Colors.grey, width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+
+                // 5. Enlace a Registro
+                TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PantallaRegistro(),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    '¿No tienes cuenta? Regístrate aquí',
+                    style: TextStyle(
+                      color: Color(0xFF0D47A1),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+////////////////////////////// PANTALLA INICIAR SESIÓN //////////////////////////////
+class PantallaLogin extends StatefulWidget {
+  const PantallaLogin({super.key});
+
+  @override
+  State<PantallaLogin> createState() => _PantallaLoginState();
+}
+
+class _PantallaLoginState extends State<PantallaLogin> {
+  final TextEditingController _correoController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  Future<void> loginManualSimulado() async {
+    // Simulación visual
+    if (_correoController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor llena los campos')),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Verificando credenciales...')),
+    );
+    await Future.delayed(const Duration(seconds: 1)); // Espera falsa
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const PantallaMenu()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text(
+          'Iniciar Sesión',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF0D47A1),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            const Icon(
+              Icons.account_circle,
+              size: 100,
+              color: Color(0xFF0D47A1),
+            ),
+            const SizedBox(height: 30),
+            TextField(
+              controller: _correoController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Correo Electrónico',
+                prefixIcon: const Icon(Icons.email, color: Color(0xFF0D47A1)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Contraseña',
+                prefixIcon: const Icon(Icons.lock, color: Color(0xFF0D47A1)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: loginManualSimulado,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D47A1),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Ingresar',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Solo dejamos el login manual en esta pantalla para no duplicar botones
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    );
+  }
+}
+
+
+////////////////////////////// PANTALLA REGISTRO MANUAL //////////////////////////////
+class PantallaRegistro extends StatefulWidget {
+  const PantallaRegistro({super.key});
+
+  @override
+  State<PantallaRegistro> createState() => _PantallaRegistroState();
+}
+
+class _PantallaRegistroState extends State<PantallaRegistro> {
+  // Controladores visuales
+  final _nombresCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _cedulaCtrl = TextEditingController();
+  final _telCtrl = TextEditingController();
+  final _edadCtrl = TextEditingController();
+  
+  bool _aceptaTerminos = false;
+
+  Future<void> registrarUsuarioSimulado() async {
+    if (!_aceptaTerminos) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Debes aceptar los términos para continuar')));
+      return;
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Creando cuenta inclusiva...')));
+    await Future.delayed(const Duration(seconds: 1)); // Espera falsa
+
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const PantallaMenu()),
+        (Route<dynamic> route) => false,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Crear Cuenta', style: TextStyle(color: Colors.white)), 
+        backgroundColor: const Color(0xFF0D47A1),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Text("Ingresa tus datos para registrarte:", style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 20),
+
+            // Campos de texto con íconos
+            TextField(controller: _nombresCtrl, decoration: InputDecoration(labelText: 'Nombres y Apellidos', prefixIcon: const Icon(Icons.person, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 15),
+            TextField(controller: _emailCtrl, keyboardType: TextInputType.emailAddress, decoration: InputDecoration(labelText: 'Correo Electrónico', prefixIcon: const Icon(Icons.email, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 15),
+            TextField(controller: _passCtrl, obscureText: true, decoration: InputDecoration(labelText: 'Contraseña', prefixIcon: const Icon(Icons.lock, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 15),
+            TextField(controller: _cedulaCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Cédula', prefixIcon: const Icon(Icons.badge, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 15),
+            TextField(controller: _telCtrl, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: 'Celular', prefixIcon: const Icon(Icons.phone_android, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 15),
+            TextField(controller: _edadCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Edad', prefixIcon: const Icon(Icons.cake, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            
+            const SizedBox(height: 30),
+
+            // 👇 TÉRMINOS Y CONDICIONES INCLUSIVOS
+            InkWell(
+              onTap: () {
+                setState(() => _aceptaTerminos = !_aceptaTerminos);
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 5.0),
+                child: Row(
+                  children: [
+                    Transform.scale(
+                      scale: 1.3, // Hace el cuadrito un 30% más grande
+                      child: Checkbox(
+                        value: _aceptaTerminos,
+                        activeColor: const Color(0xFF0D47A1),
+                        onChanged: (bool? valorNuevo) {
+                          setState(() => _aceptaTerminos = valorNuevo ?? false);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Acepto los Términos, Condiciones y Políticas de Privacidad.',
+                        style: TextStyle(fontSize: 16, color: Colors.black87, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+            
+            ElevatedButton(
+              onPressed: registrarUsuarioSimulado,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 55), 
+                backgroundColor: const Color(0xFF0D47A1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Registrarme', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 15),
+
+            // Botón de cancelar
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              style: TextButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+              child: const Text('Volver al inicio', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+////////////////////////////// PANTALLA COMPLETAR PERFIL (GOOGLE) //////////////////////////////
+class PantallaCompletarPerfil extends StatefulWidget {
+  const PantallaCompletarPerfil({super.key});
+
+  @override
+  State<PantallaCompletarPerfil> createState() => _PantallaCompletarPerfilState();
+}
+
+class _PantallaCompletarPerfilState extends State<PantallaCompletarPerfil> {
+  final _cedulaCtrl = TextEditingController();
+  final _telCtrl = TextEditingController();
+  final _edadCtrl = TextEditingController();
+  
+  bool _aceptaTerminos = false;
+
+  Future<void> guardarPerfilSimulado() async {
+    if (!_aceptaTerminos) {
+       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Acepta los términos para continuar')));
+       return;
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardando perfil inclusivo...')));
+    await Future.delayed(const Duration(seconds: 1)); // Espera falsa
+
+    if (mounted) {
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaMenu()));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+          tooltip: 'Volver al inicio',
+          onPressed: () {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaPrincipal()));
+          },
+        ),
+        title: const Text("Completa tu Perfil", style: TextStyle(color: Colors.white)), 
+        backgroundColor: const Color(0xFF0D47A1),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const Text("¡Bienvenido! Te registraste con Google. Solo faltan estos datos:", style: TextStyle(fontSize: 16)),
+            const SizedBox(height: 25),
+            
+            // Inputs con íconos y bordes claros
+            TextField(controller: _cedulaCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Cédula', prefixIcon: const Icon(Icons.badge, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 15),
+            TextField(controller: _telCtrl, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: 'Celular', prefixIcon: const Icon(Icons.phone_android, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            const SizedBox(height: 15),
+            TextField(controller: _edadCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Edad', prefixIcon: const Icon(Icons.cake, color: Color(0xFF0D47A1)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+            
+            const SizedBox(height: 40), // Más espacio para respirar
+
+            // Checkbox Términos y Condiciones Inclusivo
+            InkWell(
+              onTap: () {
+                setState(() => _aceptaTerminos = !_aceptaTerminos);
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10.0, horizontal: 5.0),
+                child: Row(
+                  children: [
+                    Transform.scale(
+                      scale: 1.3,
+                      child: Checkbox(
+                        value: _aceptaTerminos,
+                        activeColor: const Color(0xFF0D47A1),
+                        onChanged: (bool? valorNuevo) {
+                          setState(() => _aceptaTerminos = valorNuevo ?? false);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Acepto los Términos, Condiciones y Políticas de Privacidad.',
+                        style: TextStyle(fontSize: 16, color: Colors.black87, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+
+            ElevatedButton(
+              onPressed: guardarPerfilSimulado,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 55), 
+                backgroundColor: const Color(0xFF0D47A1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Finalizar', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 15),
+
+            TextButton(
+              onPressed: () {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PantallaPrincipal()));
+              },
+              style: TextButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+              child: const Text('Cancelar y volver atrás', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+////////////////////////////// PANTALLA MENÚ PRINCIPAL (40/40/20) //////////////////////////////
+class PantallaMenu extends StatelessWidget {
+  const PantallaMenu({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Column(
+        children: [
+          // 40% Guía General
+          Expanded(
+            flex: 2,
+            child: InkWell(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ir a Guía General')),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                color: const Color(0xFF222222),
+                child: const Center(
+                  child: Text(
+                    "GUÍA\nGENERAL",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 40% Guía Específica
+          Expanded(
+            flex: 2,
+            child: InkWell(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ir a Guía Específica')),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                color: const Color(0xFFF0C14B),
+                child: const Center(
+                  child: Text(
+                    "GUÍA\nESPECÍFICA",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 20% Perfil / Salir
+          Expanded(
+            flex: 1,
+            child: InkWell(
+              onTap: () async {
+                // Simular Logout
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Cerrando sesión...')),
+                );
+                await Future.delayed(const Duration(seconds: 1));
+                if (context.mounted) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PantallaPrincipal(),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                color: const Color(0xFF0D47A1),
+                child: const Center(
+                  child: Text(
+                    "CERRAR SESIÓN",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
