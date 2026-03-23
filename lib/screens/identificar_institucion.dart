@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:itca_access/screens/solicitar_acceso.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
@@ -24,6 +25,7 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
   String _mensaje =
       "Por favor, escanea para buscar un punto de identificación y así iniciar tu recorrido en la app.";
   String _nombreInstitucion = "";
+  String _idInstitucion = "";
 
   @override
   void initState() {
@@ -198,10 +200,15 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
         }
 
         // Actualizamos la pantalla
+        // Actualizamos la pantalla
         setState(() {
           _institucionEncontrada = true;
           _escaneando = false;
           _nombreInstitucion = nombreFinal;
+
+          // ✨ ¡ESTA ES LA LÍNEA MÁGICA QUE FALTABA! ✨
+          _idInstitucion = idDeLaInstitucion;
+
           _mensaje = "¡Te hemos ubicado con éxito!";
         });
       } else {
@@ -286,13 +293,14 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
               const SizedBox(height: 50),
 
               // VISTAS DINÁMICAS
+              // VISTAS DINÁMICAS
               if (_institucionEncontrada) ...[
                 Text(
-                  "Bienvenido a:",
+                  "Has llegado a:",
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 Text(
                   _nombreInstitucion,
                   textAlign: TextAlign.center,
@@ -302,23 +310,72 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
                     color: Color(0xFF1A237E),
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 25),
+
+                // --- NUEVO: MENSAJE DE CONTROL DE SEGURIDAD ---
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.security,
+                        color: Colors.orange,
+                        size: 30,
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Text(
+                          "Por favor, acércate a la recepción para solicitar tu acceso y poder navegar dentro de las instalaciones.",
+                          style: TextStyle(
+                            color: Colors.orange.shade900,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+
+                // --- NUEVO: BOTÓN SOLICITAR ACCESO ---
                 ElevatedButton.icon(
                   onPressed: () {
-                    // TODO: Navegar a la siguiente pantalla (Ej: Mapa o Menú)
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SolicitarAccesoScreen(
+                          institucionId: _idInstitucion,
+                          nombreInstitucion: _nombreInstitucion,
+                        ),
+                      ),
+                    );
                   },
-                  icon: const Icon(Icons.login, color: Colors.white),
+                  icon: const Icon(
+                    Icons.how_to_reg,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                   label: const Text(
-                    "INGRESAR",
+                    "SOLICITAR ACCESO",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors
+                        .orange
+                        .shade700, // Color naranja para indicar "control/espera"
                     padding: const EdgeInsets.symmetric(vertical: 20),
+                    elevation: 3,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'; // Para la base de dato
 import 'identificar_institucion.dart';
 import 'registro_usuario.dart';
 import 'completar_perfil_usuario.dart';
+import 'sesion_usuario.dart';
 
 class PantallaPrincipal extends StatefulWidget {
   const PantallaPrincipal({super.key});
@@ -85,7 +86,25 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
             );
             return; // Bloqueamos el paso
           }
+          // ---> NUEVO: Guardamos tus datos en la memoria global
+          // ✨ ¡El usuario existe y la clave es correcta!
 
+          // ---> GUARDAMOS TODOS LOS DATOS EN LA MEMORIA GLOBAL <---
+          SesionUsuario.idActual = respuesta['id'];
+          SesionUsuario.nombres = respuesta['nombres'] ?? "";
+          SesionUsuario.apellidos = respuesta['apellidos'] ?? "";
+          SesionUsuario.cedula = respuesta['cedula'] ?? "";
+          SesionUsuario.correo =
+              respuesta['email'] ?? ""; // O 'correo', según tu tabla
+          SesionUsuario.fotoUrl = respuesta['foto_url'] ?? "";
+
+          // 5. Todo en orden, le damos la bienvenida
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Bienvenido, ${SesionUsuario.nombres}'),
+              backgroundColor: Colors.green,
+            ),
+          );
           // 5. Todo en orden, le damos la bienvenida
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
