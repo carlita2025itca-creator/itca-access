@@ -7,11 +7,13 @@ import 'dart:async'; // ✨ 1. IMPORTANTE: Agregar esta librería para el Timer
 class SolicitarAccesoScreen extends StatefulWidget {
   final String institucionId;
   final String nombreInstitucion;
+  final String macDelBeacon;
 
   const SolicitarAccesoScreen({
     super.key,
     required this.institucionId,
     required this.nombreInstitucion,
+    required this.macDelBeacon,
   });
 
   @override
@@ -112,7 +114,7 @@ class _SolicitarAccesoScreenState extends State<SolicitarAccesoScreen> {
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ChatBotUsuarioScreen(),
+                    builder: (context) => ChatBotUsuarioScreen(),
                   ),
                 );
               }

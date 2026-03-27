@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart'; // PAQUETE DE VOZ (Offline)
-import 'dart:async'; // Necesario para la respuesta simulada
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter_compass/flutter_compass.dart';
+import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/services.dart'; // Librería nativa de Flutter
+// import 'package:vibration/vibration.dart'; // Descomenta si usas el paquete de vibración
 
 class ChatBotUsuarioScreen extends StatefulWidget {
   const ChatBotUsuarioScreen({super.key});
@@ -10,297 +15,282 @@ class ChatBotUsuarioScreen extends StatefulWidget {
 }
 
 class _ChatBotUsuarioScreenState extends State<ChatBotUsuarioScreen> {
-  final TextEditingController _controladorMensaje = TextEditingController();
-  final FlutterTts _flutterTts = FlutterTts(); // Instancia del lector de voz
-  final List<Map<String, dynamic>> _mensajes = [];
+  // ================= 1. CONFIGURACIÓN DEL SISTEMA =================
+  final FlutterTts _tts = FlutterTts();
 
-  bool _estaEscribiendo = false;
-  bool _estaEscuchando = false; // Simulación para el micrófono
+  // TUS DATOS REALES
+  final String macEntrada = "DD:34:02:0C:00:DF"; // Beacon a -64
+  final String macPasillo = "DD:34:02:0C:01:ED"; // Beacon a -58
+  final int rssiAlMetro = -59; // Rssi@1m de tu imagen
+
+  // CONFIGURACIÓN DE NAVEGACIÓN
+  final double anguloIdealNorte =
+      0.0; // Cambia esto por los grados reales del pasillo
+  final double margenError = 20.0;
+
+  // ================= 2. VARIABLES DE ESTADO =================
+  List<Map<String, String>> mensajesChat = [];
+  StreamSubscription<List<ScanResult>>? _scanSubscription;
+  StreamSubscription<CompassEvent>? _compassSubscription;
+
+  bool enRuta = false;
+  bool haLlegado = false;
+  double distanciaActual = 100.0;
+  double _rssiSuavizado = -100.0; // Filtro para estabilizar señal
+
+  // Controladores de Spam para el Chat
+  DateTime? _ultimoAvisoBrujula;
+  DateTime? _ultimoAvisoDistancia;
 
   @override
   void initState() {
     super.initState();
-    _configurarVoz(); // Iniciamos configuración de voz (Offline)
-
-    // MENSAJE DE BIENVENIDA DEL BOT
-    String bienvenida =
-        "¡Hola! Soy tu asistente de ITCA Access. ¿A qué institución o área deseas ir hoy?";
-    _mensajes.add({"texto": bienvenida, "esUsuario": false});
-
-    // El bot también saluda por voz al iniciar
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _flutterTts.speak(bienvenida);
-    });
-  }
-
-  // ================= CONFIGURACIÓN DE VOZ OFFLINE =================
-  Future<void> _configurarVoz() async {
-    // Configuraciones básicas para español
-    await _flutterTts.setLanguage("es-ES"); // Español
-    await _flutterTts.setSpeechRate(0.5); // Velocidad normal (0.0 a 1.0)
-    await _flutterTts.setVolume(1.0); // Volumen al máximo
-    await _flutterTts.setPitch(1.0); // Tono de voz normal
-  }
-
-  // ================= 1. ENVIAR MENSAJE A LA PANTALLA =================
-  void _enviarMensaje(String texto) {
-    if (texto.trim().isEmpty) return;
-
-    setState(() {
-      // 1. Agregamos lo que el usuario escribió a la pantalla
-      _mensajes.add({"texto": texto, "esUsuario": true});
-      _controladorMensaje.clear();
-      _estaEscribiendo = false;
-    });
-
-    // 2. Simulamos que el bot procesa
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        // 3. Llamamos a nuestro "Cerebro Offline" (Reglas del ITCA)
-        String respuestaDelBot = _cerebroOfflineITCA(texto);
-
-        setState(() {
-          _mensajes.add({"texto": respuestaDelBot, "esUsuario": false});
-        });
-
-        // 🔊 ✨ ¡MAGIA HÍBRIDA! ✨
-        // El celular lee la respuesta en voz alta al mismo tiempo que muestra el texto.
-        // Esto sirve tanto para personas ciegas (audio) como sordas (texto).
-        _flutterTts.speak(respuestaDelBot);
-      }
-    });
-  }
-
-  // ================= 2. EL CEREBRO OFFLINE (Reglas del ITCA) =================
-  String _cerebroOfflineITCA(String mensajeUsuario) {
-    // 1. Pasamos todo a minúsculas para que sea más fácil buscar las palabras
-    String msj = mensajeUsuario.toLowerCase();
-
-    // 2. Creamos nuestras reglas con palabras clave
-    if (msj.contains("baño") ||
-        msj.contains("sanitario") ||
-        msj.contains("baños")) {
-      return "Los baños están ubicados en la planta baja. Sigue recto por el pasillo principal y los encontrarás a tu derecha.";
-    } else if (msj.contains("biblioteca") ||
-        msj.contains("libro") ||
-        msj.contains("estudiar")) {
-      return "La biblioteca se encuentra en el segundo piso. Utiliza las gradas principales y gira a la izquierda.";
-    } else if (msj.contains("secretaria") ||
-        msj.contains("información") ||
-        msj.contains("recepcion") ||
-        msj.contains("registro")) {
-      return "La secretaría está en la entrada principal del edificio, frente a la puerta de cristal.";
-    } else if (msj.contains("rectorado") || msj.contains("director")) {
-      return "El rectorado está en el tercer piso. Por favor, solicita asistencia en secretaría primero.";
-    } else if (msj.contains("hola") ||
-        msj.contains("buenos") ||
-        msj.contains("saludos")) {
-      return "¡Hola! Bienvenido al ITCA. Dime, ¿a qué lugar necesitas ir?";
-    } else if (msj.contains("gracias") || msj.contains("amable")) {
-      return "¡De nada! Es un placer ayudarte. ¿Hay algo más en lo que te pueda guiar?";
-    } else {
-      // 3. El mensaje de "No entendí" (El Plan de Respaldo)
-      return "Lo siento, no te entendí muy bien. ¿Podrías usar palabras clave como 'baño', 'biblioteca' o 'secretaría'?";
-    }
-  }
-
-  // Simulación de escuchar por micrófono
-  void _alternarMicrofono() {
-    setState(() {
-      _estaEscuchando = !_estaEscuchando;
-      if (_estaEscuchando) {
-        // Aquí luego conectaremos el paquete speech_to_text real
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎤 Escuchando... Di algo (Simulación)'),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      }
-    });
+    _configurarVoz();
+    _saludoInicial();
+    _iniciarSensores();
   }
 
   @override
+  void dispose() {
+    _scanSubscription?.cancel();
+    _compassSubscription?.cancel();
+    FlutterBluePlus.stopScan();
+    _tts.stop();
+    super.dispose();
+  }
+
+  // ================= 3. MOTOR DEL ASISTENTE (VOZ + CHAT) =================
+  Future<void> _configurarVoz() async {
+    await _tts.setLanguage("es-ES");
+    await _tts.setSpeechRate(0.5);
+  }
+
+  void _botHabla(String texto) {
+    if (!mounted) return;
+    setState(() {
+      mensajesChat.insert(0, {'emisor': 'bot', 'texto': texto});
+    });
+    _tts.speak(texto);
+  }
+
+  void _saludoInicial() {
+    _botHabla(
+      "Hola. Soy tu asistente del ITCA. Acércate a la Entrada Principal para comenzar.",
+    );
+  }
+
+  // ================= 4. CÁLCULO DE DISTANCIA =================
+  double _calcularMetros(double rssi) {
+    if (rssi == 0) return 100.0;
+    return math.pow(10.0, ((rssiAlMetro - rssi) / (10.0 * 2.5))).toDouble();
+  }
+
+  // ================= 5. LÓGICA DE SENSORES (EL CEREBRO) =================
+  void _iniciarSensores() async {
+    // ---- A. ENCENDER BLUETOOTH ----
+    // ---- A. ENCENDER BLUETOOTH ----
+    await FlutterBluePlus.startScan(continuousUpdates: true);
+    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+      if (haLlegado) return;
+
+      for (ScanResult r in results) {
+        String mac = r.device.remoteId.str;
+
+        // SOLO MONITOREAMOS EL DESTINO PARA EL "RIEL"
+        if (mac == macPasillo) {
+          // Filtro para suavizar saltos de señal
+          if (_rssiSuavizado == -100.0) _rssiSuavizado = r.rssi.toDouble();
+          _rssiSuavizado = (_rssiSuavizado * 0.8) + (r.rssi * 0.2);
+
+          double metros = _calcularMetros(_rssiSuavizado);
+          if (mounted) setState(() => distanciaActual = metros);
+
+          // INICIO DE RUTA
+          if (!enRuta && r.rssi > -70) {
+            enRuta = true;
+            _botHabla(
+              "Señal del pasillo detectada. Gira sobre tu eje hasta que te indique caminar.",
+            );
+          }
+
+          // LLEGADA A LA META
+          if (enRuta && metros < 1.5) {
+            haLlegado = true;
+            enRuta = false;
+            _botHabla("Excelente. Has llegado al pasillo uno. Detente aquí.");
+            HapticFeedback.heavyImpact(); // <--- Vibración nativa fuerte
+            FlutterBluePlus.stopScan();
+          }
+        }
+      }
+    });
+
+    // ---- B. ENCENDER BRÚJULA (EL RIEL) ----
+    _compassSubscription = FlutterCompass.events?.listen((CompassEvent event) {
+      if (!enRuta || haLlegado || event.heading == null) return;
+
+      double anguloActual = event.heading!;
+      double diff = (anguloActual - anguloIdealNorte);
+
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+
+      final ahora = DateTime.now();
+
+      // ESTÁ DESVIADO
+      if (_ultimoAvisoBrujula == null ||
+          ahora.difference(_ultimoAvisoBrujula!).inSeconds > 5) {
+        if (diff > 0) {
+          _botHabla("Te desvías. Gira un poco a la izquierda.");
+        } else {
+          _botHabla("Te desvías. Gira un poco a la derecha.");
+        }
+        _ultimoAvisoBrujula = ahora;
+        HapticFeedback.vibrate(); // <--- Vibración nativa normal
+      }
+      // ESTÁ ALINEADO
+      else {
+        if (_ultimoAvisoDistancia == null ||
+            ahora.difference(_ultimoAvisoDistancia!).inSeconds > 12) {
+          if (distanciaActual > 2.0 && distanciaActual < 20.0) {
+            _botHabla(
+              "Vas en línea recta. Faltan ${distanciaActual.toStringAsFixed(0)} metros.",
+            );
+            _ultimoAvisoDistancia = ahora;
+          }
+        }
+      }
+    });
+  }
+
+  // ================= 6. INTERFAZ GRÁFICA (DISEÑO DEL CHAT) =================
+  @override
   Widget build(BuildContext context) {
-    // Definimos el color azul corporativo
-    const Color azulITCA = Color(0xFF1A237E);
-
     return Scaffold(
-      backgroundColor: Colors.grey[100],
-
-      // ================= C) DISEÑO DEL APPBAR SOLICITADO =================
       appBar: AppBar(
-        backgroundColor: azulITCA,
-        automaticallyImplyLeading:
-            false, // Quitamos la flecha de "atrás" automática
-        elevation: 0,
-
-        // 1. TÍTULO: ITCA Access
-        title: const Text(
-          "ITCA Access",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-
-        // 2. ACCIONES: Bolita de perfil a la derecha
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 15.0),
-            child: CircleAvatar(
-              backgroundColor: Colors.white.withOpacity(0.2), // Fondo sutil
-              child: const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 24,
-              ), // Icono por defecto
-              // Si tienes una imagen real, usa:
-              // backgroundImage: AssetImage('assets/tu_foto_perfil.png'),
-            ),
-          ),
-        ],
+        title: const Text('Asistente ITCA Access'),
+        backgroundColor: const Color(0xFF1A237E),
+        foregroundColor: Colors.white,
       ),
-
       body: Column(
         children: [
-          // A) ZONA DE CHAT (Burbujas)
+          // ZONA DE BURBUJAS DE CHAT
           Expanded(
             child: ListView.builder(
+              reverse: true, // Lo más nuevo abajo
               padding: const EdgeInsets.all(15),
-              reverse: true, // Empezamos a ver el chat desde abajo
-              itemCount: _mensajes.length,
+              itemCount: mensajesChat.length,
               itemBuilder: (context, index) {
-                // Invertimos el índice por usar reverse:true
-                final msjReverse = _mensajes[_mensajes.length - 1 - index];
-                final esUsuario = msjReverse['esUsuario'];
-                return _construirBurbuja(
-                  msjReverse['texto'],
-                  esUsuario,
-                  azulITCA,
+                final msg = mensajesChat[index];
+                final esBot = msg['emisor'] == 'bot';
+
+                return Align(
+                  alignment: esBot
+                      ? Alignment.centerLeft
+                      : Alignment.centerRight,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 5),
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: esBot ? Colors.blue.shade50 : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(20).copyWith(
+                        bottomLeft: esBot
+                            ? const Radius.circular(0)
+                            : const Radius.circular(20),
+                        bottomRight: !esBot
+                            ? const Radius.circular(0)
+                            : const Radius.circular(20),
+                      ),
+                      border: Border.all(
+                        color: esBot
+                            ? Colors.blue.shade100
+                            : Colors.green.shade100,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (esBot)
+                          const Icon(
+                            Icons.support_agent,
+                            color: Color(0xFF1A237E),
+                            size: 24,
+                          ),
+                        if (esBot) const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            msg['texto']!,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               },
             ),
           ),
 
-          // B) ZONA DE ESCRITURA (Minimalista)
+          // BARRA INFERIOR DE ESTADO VISUAL
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: BoxDecoration(
+            padding: const EdgeInsets.all(15),
+            decoration: const BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
+                  color: Colors.black12,
+                  blurRadius: 5,
+                  offset: Offset(0, -2),
                 ),
               ],
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // CAJA DE TEXTO
-                Expanded(
-                  child: TextField(
-                    controller: _controladorMensaje,
-                    onChanged: (texto) {
-                      setState(() {
-                        _estaEscribiendo = texto.trim().isNotEmpty;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: _estaEscuchando
-                          ? "Escuchando..."
-                          : "Escribe un mensaje...",
-                      hintStyle: TextStyle(
-                        color: _estaEscuchando ? Colors.orange : Colors.grey,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[200],
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 15,
-                      ),
+                Row(
+                  children: [
+                    Icon(
+                      enRuta
+                          ? Icons.navigation
+                          : (haLlegado
+                                ? Icons.check_circle
+                                : Icons.bluetooth_searching),
+                      color: enRuta
+                          ? Colors.blue
+                          : (haLlegado ? Colors.green : Colors.grey),
+                      size: 28,
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                // EL BOTÓN INTELIGENTE (Cambia entre Micrófono y Enviar)
-                GestureDetector(
-                  onTap: () {
-                    if (_estaEscribiendo) {
-                      _enviarMensaje(_controladorMensaje.text);
-                    } else {
-                      _alternarMicrofono();
-                    }
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.all(15),
-                    decoration: BoxDecoration(
-                      color: _estaEscribiendo
-                          ? azulITCA
-                          : (_estaEscuchando
-                                ? Colors.red
-                                : Colors.orange.shade700),
-                      shape: BoxShape.circle,
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          enRuta
+                              ? "Navegando..."
+                              : (haLlegado
+                                    ? "Destino Alcanzado"
+                                    : "Buscando..."),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (enRuta && !haLlegado)
+                          Text(
+                            "Faltan: ${distanciaActual.toStringAsFixed(1)} metros",
+                            style: TextStyle(color: Colors.grey.shade700),
+                          ),
+                      ],
                     ),
-                    child: Icon(
-                      _estaEscribiendo
-                          ? Icons.send
-                          : (_estaEscuchando ? Icons.mic_off : Icons.mic),
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
+                  ],
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // Diseño de las burbujitas de chat
-  Widget _construirBurbuja(String texto, bool esUsuario, Color colorUsuario) {
-    return Align(
-      alignment: esUsuario ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 15), // Solo para el espacio
-        constraints: const BoxConstraints(
-          maxWidth: 300,
-        ), // Solo para el ancho máximo
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        decoration: BoxDecoration(
-          color: esUsuario ? colorUsuario : Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(esUsuario ? 20 : 0),
-            bottomRight: Radius.circular(esUsuario ? 0 : 20),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.05),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Text(
-          texto,
-          style: TextStyle(
-            color: esUsuario ? Colors.white : Colors.black87,
-            fontSize: 16,
-          ),
-        ),
       ),
     );
   }

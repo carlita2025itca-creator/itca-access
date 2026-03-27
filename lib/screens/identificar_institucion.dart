@@ -26,6 +26,7 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
       "Por favor, escanea para buscar un punto de identificación y así iniciar tu recorrido en la app.";
   String _nombreInstitucion = "";
   String _idInstitucion = "";
+  String _macDelBeaconEncontrado = "";
 
   @override
   void initState() {
@@ -50,7 +51,7 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
     super.dispose();
   }
 
-  // ================= 1. ACCIÓN DEL BOTÓN ESCANEAR =================
+  // ================= 1. ACCIÓN DEL BOTÓN ESCANEAR (VERSIÓN BLINDADA) =================
   void _botonEscanearPresionado() async {
     if (kIsWeb) {
       _mostrarAlerta(
@@ -60,40 +61,66 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
       return;
     }
 
-    // --- PEDIR PERMISOS A ANDROID ANTES DE ESCANEAR ---
+    // --- PEDIR PERMISOS Y VALIDAR SENSORES EN ANDROID ---
     if (defaultTargetPlatform == TargetPlatform.android) {
+      // ✨ LA LÍNEA MÁGICA PARA HONOR/XIAOMI: Verificar si el GPS físico está encendido
+      bool gpsEncendido = await Permission.location.serviceStatus.isEnabled;
+
+      if (!gpsEncendido) {
+        _mostrarAlerta(
+          "Ubicación Apagada",
+          "Por favor, baja el panel de notificaciones y enciende el GPS (Ubicación). Es un requisito obligatorio de Android para poder detectar las señales del edificio.",
+        );
+        return; // Detenemos todo hasta que el usuario encienda el GPS
+      }
+
+      // Solicitamos los permisos estrictos (Ubicación precisa y Bluetooth)
       Map<Permission, PermissionStatus> estados = await [
         Permission.location,
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
       ].request();
 
-      // Si el usuario denegó los permisos, detenemos el proceso
+      // Si el usuario denegó permanentemente los permisos
+      if (estados[Permission.location]!.isPermanentlyDenied ||
+          estados[Permission.bluetoothScan]!.isPermanentlyDenied) {
+        _mostrarAlerta(
+          "Permisos bloqueados",
+          "Has denegado los permisos. Por favor, ve a los ajustes de tu celular, busca esta app y habilita la Ubicación y los Dispositivos Cercanos manualmente.",
+        );
+        // Opcional: openAppSettings(); para enviarlo directo a la configuración
+        return;
+      }
+
+      // Si simplemente los denegó esta vez
       if (estados[Permission.location]!.isDenied ||
           estados[Permission.bluetoothScan]!.isDenied) {
         _mostrarAlerta(
           "Permisos necesarios",
-          "Necesitamos acceso a la ubicación y dispositivos cercanos para detectar la entrada. Por favor, acéptalos.",
+          "Necesitamos acceso a la ubicación y dispositivos cercanos para detectar la entrada. Sin esto, la app no podrá ubicarte.",
         );
         return;
       }
     }
     // ---------------------------------------------------------
 
+    // Verificar si el Bluetooth está encendido
     if (!_isBluetoothOn) {
       _mostrarAlerta(
         "Bluetooth apagado",
         "Para poder ubicarte en el edificio, necesitamos que enciendas tu Bluetooth. ¡Prometemos no gastar mucha batería!",
       );
       try {
-        await FlutterBluePlus.turnOn();
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          await FlutterBluePlus.turnOn();
+        }
       } catch (e) {
         debugPrint("El usuario debe encenderlo manualmente.");
       }
       return;
     }
 
-    // Si tiene permisos y el Bluetooth está encendido, iniciamos la búsqueda
+    // Si pasamos TODAS las barreras de seguridad, iniciamos la búsqueda
     setState(() {
       _escaneando = true;
       _mensaje = "Buscando señal cercana... Acércate a un punto de acceso.";
@@ -205,9 +232,10 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
           _institucionEncontrada = true;
           _escaneando = false;
           _nombreInstitucion = nombreFinal;
-
-          // ✨ ¡ESTA ES LA LÍNEA MÁGICA QUE FALTABA! ✨
           _idInstitucion = idDeLaInstitucion;
+
+          // ✨ NUEVO: Guardamos la MAC que acabamos de leer
+          _macDelBeaconEncontrado = mac;
 
           _mensaje = "¡Te hemos ubicado con éxito!";
         });
@@ -345,13 +373,21 @@ class _SeleccionEdificioScreenState extends State<SeleccionEdificioScreen> {
 
                 // --- NUEVO: BOTÓN SOLICITAR ACCESO ---
                 ElevatedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
+                    // ✨ Le agregamos 'async'
+
+                    // ✨ APAGADO DE SEGURIDAD: Cortamos el Bluetooth de esta pantalla
+                    await FlutterBluePlus.stopScan();
+                    if (!mounted) return;
+
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => SolicitarAccesoScreen(
                           institucionId: _idInstitucion,
                           nombreInstitucion: _nombreInstitucion,
+                          // ✨ NUEVO: Le pasamos la MAC a la pantalla de Acceso
+                          macDelBeacon: _macDelBeaconEncontrado,
                         ),
                       ),
                     );

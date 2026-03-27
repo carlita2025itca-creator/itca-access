@@ -9,10 +9,8 @@ Future<void> main() async {
 
   // ✨ 3. AQUÍ ESTÁ LA MAGIA: Conectamos la app a tu base de datos
   await Supabase.initialize(
-    url:
-        'https://btbzggtbnbkqgyhbdsqx.supabase.co', // 👈 Pega tu URL de Supabase aquí
-    anonKey:
-        'sb_publishable_LC69zVXpoIOoSG3BZcO9vw_H_rSlP0H', // 👈 Pega tu Anon Key aquí
+    url: 'https://btbzggtbnbkqgyhbdsqx.supabase.co', //  URL de Supabase aquí
+    anonKey: 'sb_publishable_LC69zVXpoIOoSG3BZcO9vw_H_rSlP0H', // Anon Key aquí
   );
 
   runApp(const ItcaAccessApp());
